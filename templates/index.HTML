@@ -29,37 +29,22 @@
                 <h2 class="text-lg font-semibold text-slate-200 mb-4">1. Input Pipeline Configuration</h2>
                 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <!-- Protein File Upload -->
-                    <div class="bg-slate-900 border border-dashed border-slate-700 rounded-lg p-4 text-center">
-                        <label class="block text-xs font-medium text-slate-400 mb-2">TARGET PROTEIN (.PDB)</label>
-                        <input type="file" id="protein-file" class="hidden" onchange="uploadSelectedFile('protein', this)">
-                        <button onclick="document.getElementById('protein-file').click()" class="w-full bg-slate-800 hover:bg-slate-700 text-xs py-2 px-3 rounded border border-slate-600 transition">
-                            Choose Protein File
-                        </button>
-                        <p id="protein-status" class="text-xs text-slate-500 mt-2 truncate">No file chosen</p>
-                    </div>
+                    <!-- Protein Upload Field -->
+                <div class="mb-3">
+               <label for="proteinFile" class="form-label">Target Protein Structure (.pdb)</label>
+               <input class="form-type" type="file" id="proteinFile" accept=".pdb">
+               </div>
 
-                    <!-- Ligand Database Upload -->
-                    <div class="bg-slate-900 border border-dashed border-slate-700 rounded-lg p-4 text-center">
-                        <label class="block text-xs font-medium text-slate-400 mb-2">LIGAND DATABASE (.SDF)</label>
-                        <input type="file" id="ligand-file" class="hidden" onchange="uploadSelectedFile('ligand', this)">
-                        <button onclick="document.getElementById('ligand-file').click()" class="w-full bg-slate-800 hover:bg-slate-700 text-xs py-2 px-3 rounded border border-slate-600 transition">
-                            Choose SDF Library
-                        </button>
-                        <p id="ligand-status" class="text-xs text-slate-500 mt-2 truncate">No file chosen</p>
-                    </div>
+               <!-- Ligand Library Field -->
+               <div class="mb-3">
+               <label for="ligandFile" class="form-label">Ligand Batch Library (.sdf)</label>
+               <input class="form-type" type="file" id="ligandFile" accept=".sdf,.mol2">
+               </div>
 
-                    <!-- Config File Upload -->
-                    <div class="bg-slate-900 border border-dashed border-slate-700 rounded-lg p-4 text-center">
-                        <label class="block text-xs font-medium text-slate-400 mb-2">GRID CONFIG (.TXT)</label>
-                        <input type="file" id="config-file" class="hidden" onchange="uploadSelectedFile('config', this)">
-                        <button onclick="document.getElementById('config-file').click()" class="w-full bg-slate-800 hover:bg-slate-700 text-xs py-2 px-3 rounded border border-slate-600 transition">
-                            Choose Config File
-                        </button>
-                        <p id="config-status" class="text-xs text-slate-500 mt-2 truncate">No file chosen</p>
-                    </div>
-                </div>
-
+               <!-- Optional Notice for Vina Grid Config -->
+               <div class="alert alert-info">
+               <small>💡 <b>Note:</b> PyTorch Deep Learning engine utilizes automated binding pocket detection. Grid coordinates (conf.txt) are now optional.</small>
+               </div>
                 <button onclick="startScreeningPipeline()" class="w-full mt-5 bg-cyan-600 hover:bg-cyan-500 font-semibold py-2.5 rounded-lg text-sm transition flex items-center justify-center gap-2">
                     🚀 Start Virtual Screening Workflow
                 </button>
