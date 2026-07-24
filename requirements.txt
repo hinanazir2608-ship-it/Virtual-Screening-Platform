@@ -1,23 +1,26 @@
 # Flask Web Framework & WSGI
 Flask>=3.0.0
-Werkzeug>=3.0.1
+Werkzeug>=3.0.0
 
-# Computational Chemistry & Molecular Modeling
-rdkit>=2023.9.1
-pandas>=2.1.0
-numpy>=1.26.0
+# Environment Management
+python-dotenv>=1.0.0
 
-# Document & Report Generation
-python-docx>=1.1.0
+# PyTorch (For DL-based Docking Engine)
+torch>=2.0.0
+torchvision
+torchaudio
 
-# Vector Embeddings, RAG & LLM Integration
+# Cheminformatics & Computational Biology
+rdkit>=2023.3.1
+
+# RAG & LLM Integration
+groq>=0.4.0
 langchain>=0.1.0
-langchain-community>=0.0.10
+langchain-community>=0.0.20
+langchain-text-splitters>=0.0.1
 langchain-huggingface>=0.0.1
 faiss-cpu>=1.7.4
 sentence-transformers>=2.2.2
-groq>=0.4.0
 
-# Environment Management & System Utilities
-python-dotenv>=1.0.0
-requests==2.32.4
+# Document & Report Generation
+python-docx>=1.1.0
