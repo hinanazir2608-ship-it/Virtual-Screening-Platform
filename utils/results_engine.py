@@ -1,69 +1,66 @@
 import os
-import re
 import json
-import pandas as pd
+import logging
 from typing import List, Dict, Any
 
-AFFINITY_REGEX = re.compile(r"^\s*1\s+(-?\d+\.\d+)", re.MULTILINE)
+logger = logging.getLogger("ResultsEngine")
 
-def parse_affinity_from_log(log_path: str) -> float | None:
-    """Parses top binding affinity (mode 1) from an AutoDock Vina log file."""
-    if not os.path.exists(log_path):
-        return None
-    try:
-        with open(log_path, "r", encoding="utf-8") as f:
-            content = f.read()
-        match = AFFINITY_REGEX.search(content)
-        return float(match.group(1)) if match else None
-    except Exception:
-        return None
-
-def scan_and_rank_results(logs_dir: str, summary_json_path: str = None) -> List[Dict[str, Any]]:
+def scan_and_rank_results(docking_out_dir: str, summary_json_path: str = None) -> List[Dict[str, Any]]:
     """
-    Scans logs/summary for docking results and ranks them by affinity (kcal/mol).
+    PyTorch Docking Results Scanner:
+    Reads predicted affinity scores directly from JSON summary or log outputs.
     """
     results = []
-
-    # Fast-path: check if docking_summary.json exists
+    
+    # 1. Check if PyTorch engine saved a summary JSON
     if summary_json_path and os.path.exists(summary_json_path):
         try:
             with open(summary_json_path, "r", encoding="utf-8") as f:
-                summary_data = json.load(f)
-                for item in summary_data:
-                    results.append({
-                        "compound_id": item.get("compound_id"),
-                        "affinity": float(item.get("affinity", 0.0)),
-                        "log_file": item.get("log_file", ""),
-                        "out_pdbqt": item.get("out_pdbqt", "")
-                    })
-        except Exception:
-            results = []
+                results = json.load(f)
+            # Sort by affinity (assuming lower/more negative is better kcal/mol)
+            results.sort(key=lambda x: x.get("affinity", 0.0))
+            return results
+        except Exception as e:
+            logger.error(f"Error reading summary json: {e}")
 
-    # Fallback: scan directory for *_log.txt
-    if not results and os.path.exists(logs_dir):
-        for file in os.listdir(logs_dir):
+    # 2. Fallback: Scan docking output directory for PyTorch output logs/PDBs
+    if os.path.exists(docking_out_dir):
+        for file in os.listdir(docking_out_dir):
             if file.endswith("_log.txt"):
-                cid = file.replace("_log.txt", "")
-                filepath = os.path.join(logs_dir, file)
-                aff = parse_affinity_from_log(filepath)
-                if aff is not None:
-                    results.append({
-                        "compound_id": cid,
-                        "affinity": aff,
-                        "log_file": filepath,
-                        "out_pdbqt": filepath.replace("_log.txt", "_out.pdbqt")
-                    })
+                ligand_id = file.replace("_log.txt", "")
+                log_path = os.path.join(docking_out_dir, file)
+                out_pdb = os.path.join(docking_out_dir, f"{ligand_id}_docked.pdb")
+                
+                affinity = 0.0
+                try:
+                    with open(log_path, "r") as f:
+                        for line in f:
+                            if "Affinity:" in line:
+                                affinity = float(line.split(":")[1].replace("kcal/mol", "").strip())
+                except Exception:
+                    pass
 
-    # Sort ascending (more negative = stronger binding)
-    results.sort(key=lambda x: x["affinity"])
+                results.append({
+                    "compound_id": ligand_id,
+                    "affinity": affinity,
+                    "out_pdb": out_pdb,
+                    "log_file": log_path
+                })
+
+    # Sort results (best affinity first)
+    results.sort(key=lambda x: x.get("affinity", 0.0))
     return results
 
-def write_results_json(results: List[Dict[str, Any]], output_path: str) -> None:
-    """Writes results to JSON."""
+def write_results_json(results: List[Dict[str, Any]], output_path: str):
     with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(results, f, indent=2)
+        json.dump(results, f, indent=4)
 
-def write_results_csv(results: List[Dict[str, Any]], output_path: str) -> None:
-    """Writes results to downloadable CSV."""
-    df = pd.DataFrame(results)
-    df.to_csv(output_path, index=False)
+def write_results_csv(results: List[Dict[str, Any]], output_path: str):
+    import csv
+    if not results:
+        return
+    keys = list(results[0].keys())
+    with open(output_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=keys)
+        writer.writeheader()
+        writer.writerows(results)
