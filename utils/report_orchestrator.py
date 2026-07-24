@@ -13,13 +13,20 @@ try:
 except ImportError:
     RDKIT_AVAILABLE = False
 
-def run_admet_analysis(smiles_or_mol_path: str) -> Dict[str, Any]:
+def run_admet_analysis(mol_path: str) -> Dict[str, Any]:
     """Computes basic Lipinski Rule of 5 ADMET descriptors using RDKit."""
-    if not RDKIT_AVAILABLE:
+    if not RDKIT_AVAILABLE or not os.path.exists(mol_path):
         return {"MW": "N/A", "LogP": "N/A", "HBD": "N/A", "HBA": "N/A", "Violations": "N/A"}
 
     try:
-        mol = Chem.MolFromPDBQTFile(smiles_or_mol_path) if smiles_or_mol_path.endswith('.pdbqt') else Chem.MolFromSmiles(smiles_or_mol_path)
+        # PyTorch update: Read SDF or PDB instead of PDBQT
+        if mol_path.endswith('.sdf'):
+            mol = Chem.MolFromMolFile(mol_path)
+        elif mol_path.endswith('.pdb'):
+            mol = Chem.MolFromPDBFile(mol_path)
+        else:
+            mol = Chem.MolFromSmiles(mol_path)
+
         if not mol:
             return {"MW": "N/A", "LogP": "N/A", "HBD": "N/A", "HBA": "N/A", "Violations": "N/A"}
 
@@ -41,28 +48,22 @@ def run_admet_analysis(smiles_or_mol_path: str) -> Dict[str, Any]:
         return {"MW": "N/A", "LogP": "N/A", "HBD": "N/A", "HBA": "N/A", "Violations": "N/A"}
 
 def build_docx_report(metadata: Dict[str, Any], results: List[Dict[str, Any]], output_path: str):
-    """Generates a publication-ready .docx summary report."""
     doc = docx.Document()
-    
-    # Title
-    title = doc.add_heading('Virtual Screening Pipeline Report', 0)
+    title = doc.add_heading('Virtual Screening Pipeline Report (PyTorch DL Engine)', 0)
     title.runs[0].font.color.rgb = RGBColor(0x1F, 0x29, 0x37)
 
-    # Metadata
     doc.add_heading('1. Run Summary', level=1)
     p = doc.add_paragraph()
     p.add_run(f"Target Receptor: {metadata.get('receptor', 'N/A')}\n").bold = True
     p.add_run(f"Total Compounds Processed: {len(results)}\n")
-    p.add_run(f"Grid Center: {metadata.get('grid_center', 'N/A')}\n")
-    p.add_run(f"Grid Size: {metadata.get('grid_size', 'N/A')}\n")
+    p.add_run(f"Execution Engine: PyTorch Deep Learning Model\n")
 
-    # Results Table
     doc.add_heading('2. Top Candidate Hits', level=1)
     table = doc.add_table(rows=1, cols=4)
     hdr_cells = table.rows[0].cells
     hdr_cells[0].text = 'Rank'
     hdr_cells[1].text = 'Compound ID'
-    hdr_cells[2].text = 'Affinity (kcal/mol)'
+    hdr_cells[2].text = 'Affinity Score'
     hdr_cells[3].text = 'RO5 Violations'
 
     for i, res in enumerate(results[:10], 1):
@@ -74,23 +75,40 @@ def build_docx_report(metadata: Dict[str, Any], results: List[Dict[str, Any]], o
 
     doc.save(output_path)
 
-def generate_results(run_dir: str, corpus_dir: str, metadata: Dict[str, Any]) -> Dict[str, Any]:
-    """Master orchestrator function executed at the end of stage 4."""
-    logs_dir = os.path.join(run_dir, "logs")
+def rank_results(run_dir: str) -> List[Dict[str, Any]]:
+    docking_out_dir = os.path.join(run_dir, "docking_out")
     summary_json = os.path.join(run_dir, "docking_summary.json")
-    
-    # 1. Rank docking results
-    results = scan_and_rank_results(logs_dir, summary_json)
 
-    # 2. Add ADMET & RAG context
-    rag_handler = LiteratureRAGHandler(corpus_dir)
+    results = scan_and_rank_results(docking_out_dir, summary_json)
     for item in results:
-        item["admet"] = run_admet_analysis(item.get("out_pdbqt", ""))
-        item["rag_info"] = rag_handler.analyze_compound(item["compound_id"])
+        # Pass docked PDB/SDF path for ADMET
+        mol_file = item.get("out_pdb") or item.get("out_sdf", "")
+        item["admet"] = run_admet_analysis(mol_file)
 
-    # 3. Export outputs
+    return results
+
+def finalize_report(
+    run_dir: str,
+    corpus_dir: str,
+    metadata: Dict[str, Any],
+    results: List[Dict[str, Any]],
+    top_n_for_rag: int = 5
+) -> Dict[str, Any]:
+    rag_handler = LiteratureRAGHandler(corpus_dir)
+
+    for idx, item in enumerate(results):
+        if idx < top_n_for_rag:
+            item["rag_info"] = rag_handler.analyze_compound(item["compound_id"])
+        else:
+            item["rag_info"] = {
+                "compound_id": item["compound_id"],
+                "medical_uses": "Not analyzed (outside top hits).",
+                "dosage_safety": "Unspecified.",
+                "antiviral_findings": "Not analyzed (outside top hits)."
+            }
+
     write_results_json(results, os.path.join(run_dir, "results.json"))
     write_results_csv(results, os.path.join(run_dir, "results.csv"))
     build_docx_report(metadata, results, os.path.join(run_dir, "screening_report.docx"))
 
-    return {"status": "success", "total_processed": len(results)}
+    return {"status": "success", "total_processed": len(results), "results": results}
