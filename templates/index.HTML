@@ -20,6 +20,28 @@
     </header>
 
     <div class="max-w-7xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Execution Engine Indicator -->
+<div class="status-card">
+    <h5>Docking Engine Status</h5>
+    <p>Engine: <strong>PyTorch Deep Learning</strong></p>
+    <p>Device: <span id="gpu-status-badge" class="badge bg-success">Checking GPU...</span></p>
+</div>
+
+<script>
+// Fetch Hardware Status from Flask Backend
+fetch('/api/system-status')
+    .then(res => res.json())
+    .then(data => {
+        const badge = document.getElementById('gpu-status-badge');
+        if (data.cuda_available) {
+            badge.innerText = `CUDA GPU Active (${data.device})`;
+            badge.className = "badge bg-success";
+        } else {
+            badge.innerText = `CPU Mode (${data.device})`;
+            badge.className = "badge bg-warning";
+        }
+    });
+ </script>
 
         <!-- Left & Center Column: File Uploads & Telemetry -->
         <div class="lg:col-span-2 space-y-6">
